@@ -1,0 +1,10 @@
+Process:
+o A process is an independent program with its own memory space, resources, and
+state.
+o Processes are isolated from each other and communicate through inter-process
+communication (IPC) mechanisms.
+• Thread:
+o A thread is a lightweight unit of execution within a process.
+o A thread is a subsequent set of instructions that will be executed on CPU.
+o Threads within the same process share the same memory space, allowing them
+to communicate easily.

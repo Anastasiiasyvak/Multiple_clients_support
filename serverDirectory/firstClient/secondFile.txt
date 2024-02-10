@@ -1,0 +1,5 @@
+Server Implementation:
+• Implement a server program capable of accepting multiple client connections
+simultaneously.
+• Each client should work with its own subfolder on the server.
+• Utilize threading to handle multiple client requests concurrently.

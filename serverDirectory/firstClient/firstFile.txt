@@ -1,0 +1,5 @@
+This assignment focuses on a crucial aspect of software development: handling multiple clients
+concurrently through the introduction of programming threads. You will learn how to use
+threading to enable effective communication between a server and numerous clients
+simultaneously. Through practical exercises, you'll gain proficiency in thread management and
+addressing basic challenges associated with concurrent programming.

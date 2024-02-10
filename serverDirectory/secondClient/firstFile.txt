@@ -1,0 +1,3 @@
+Communication Protocol:
+• Establish a clear communication protocol between the server and clients. Define the
+format of messages for requesting operations and receiving results.

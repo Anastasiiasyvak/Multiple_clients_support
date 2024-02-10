@@ -1,0 +1,6 @@
+Client Implementation:
+• Implement a client program that connects to the server and does the same set of actions
+as in the assignment 1.
+• During the connection the client can provide its name to the server to create/choose a
+folder on the server’s side.
+• Implement error handling to manage situations where the server is busy or unresponsive.

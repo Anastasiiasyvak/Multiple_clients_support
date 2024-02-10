@@ -1,0 +1,6 @@
+Handling Multiple Clients:
+• Each client connection can be handled by a separate thread, allowing the server to
+serve multiple clients simultaneously.
+• The main Server’s thread will be listening for new connections and after accepting it a
+new thread will be created and the server will pass a socket handle to that thread.
+
