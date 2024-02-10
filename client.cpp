@@ -6,6 +6,7 @@
 
 class TCPClient {
 public:
+
     TCPClient(const char* serverIp, int port) {
         clientSocket = socket(AF_INET, SOCK_STREAM, 0);
         if (clientSocket == -1) {
@@ -64,6 +65,20 @@ public:
 
     }
 
+    void getClientName() const{
+        std::string name;
+        while (true) {
+            std::cout << "Enter client name: (to select folder on the server) ";
+            std::getline(std::cin, name);
+            if (!name.empty()) {
+                break;
+            }
+            std::cout << "Name cannot be empty. Please enter your name again." << std::endl;
+        }
+        send(clientSocket, name.c_str(), name.size(), 0);
+    }
+
+
 private:
     int clientSocket;
     sockaddr_in serverAddr;
@@ -80,6 +95,8 @@ int main() {
         perror("Connect failed");
         return 1;
     }
+
+    client.getClientName();
 
     client.command();
 
