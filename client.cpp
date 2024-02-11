@@ -87,7 +87,7 @@ private:
 
 int main() {
     const char* serverIp = "127.0.0.1";
-    int port = 12346;
+    int port = 12348;
 
     TCPClient client(serverIp, port);
 

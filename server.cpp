@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <ctime>
+#include <thread>
 
 class TCPServer {
 public:
@@ -40,34 +41,31 @@ public:
     }
 
     void startListening() {
-        sockaddr_in clientAddr{};
-        socklen_t clientAddrLen = sizeof(clientAddr);
+        while (true) {
+            sockaddr_in clientAddr{};
+            socklen_t clientAddrLen = sizeof(clientAddr);
 
-        int clientSocket = accept(serverSocket, reinterpret_cast<struct sockaddr*>(&clientAddr), &clientAddrLen);
-        if (clientSocket == -1) {
-            perror("Accept failed");
-            close(serverSocket);
-            exit(1);
+            int clientSocket = accept(serverSocket, reinterpret_cast<struct sockaddr*>(&clientAddr), &clientAddrLen);
+            if (clientSocket == -1) {
+                perror("Accept failed");
+                close(serverSocket);
+                exit(1);
+            }
+
+            std::cout << "Accepted connection from " << inet_ntoa(clientAddr.sin_addr) << ":" << ntohs(clientAddr.sin_port) <<
+                      std::endl;
+
+            std::thread clientThread(&TCPServer::handleClientRequest, this, clientSocket);
+            clientThread.detach();
         }
-
-        std::cout << "Accepted connection from " << inet_ntoa(clientAddr.sin_addr) << ":" << ntohs(clientAddr.sin_port) <<
-                  std::endl;
-
-        while(true) {
-            handleClientRequest(clientSocket);
-        }
-        close(clientSocket);
     }
 
 private:
     int serverSocket;
     sockaddr_in serverAddr;
-    sockaddr_in clientAddr;
-    socklen_t clientAddrLen = sizeof(clientAddr);
-    std::string serverDirectory = "/home/nastia/CLionProjects/csc_1homework/serverStorage";
-    std::string clientDirectory = "/home/nastia/PycharmProjects/csc_firsttt/clientDirectory";
 
-// /home/nastia/CLionProjects/csc_1homework/clientDirectory
+    std::string serverDirectory = "/home/nastia/CLionProjects/second_csc/serverStorage";
+    std::string clientDirectory = "/home/nastia/CLionProjects/second_csc/clientStorage";
 
     void handleClientRequest(int clientSocket) {
         char buffer[1024];
@@ -78,34 +76,59 @@ private:
             std::cout << "Received command: " << buffer << std::endl;
             std::string command(buffer);
 
-            if (command.find("GET ") == 0) {
-                std::string filename = command.substr(4);
-                getFile(clientSocket, filename);
-            }
-            else if (command.find("LIST") == 0) {
-                sendFileList(clientSocket);
-            }
-            else if (command.find("PUT") == 0){
-                std::string filename = command.substr(4);
-                putFile(clientSocket, filename);
-            }
-            else if (command.find("DELETE") == 0){
-                std::string filename = command.substr(7);
-                deleteFile(clientSocket, filename);
-            }
-            else if (command.find("INFO") == 0){
-                std::string filename = command.substr(5);
-                retrieveFileInfo(clientSocket, filename);
+            if (command.find("NAME ") == 0) {
+                std::string clientName = command.substr(5);
+                processClientCommands(clientSocket, clientName);
             }
             else {
                 const char* response = "Unknown command";
                 send(clientSocket, response, strlen(response), 0);
             }
         }
+        close(clientSocket);
     }
 
-    void retrieveFileInfo(int clientSocket, const std::string& filename) {
-        std::string fullFilePath = serverDirectory + "/" + filename;
+    void processClientCommands(int clientSocket, const std::string& clientName) {
+        while (true) {
+            char buffer[1024];
+            memset(buffer, 0, 1024);
+            ssize_t bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
+
+            if (bytesReceived > 0) {
+                std::string command(buffer);
+                std::cout << "Received command from client " << clientName << ": " << command << std::endl;
+
+                if (command.find("GET ") == 0) {
+                    std::string filename = command.substr(4);
+                    getFile(clientSocket, clientName, filename);
+                }
+                else if (command.find("LIST") == 0) {
+                    sendFileList(clientSocket, clientName);
+                }
+                else if (command.find("PUT") == 0){
+                    std::string filename = command.substr(4);
+                    putFile(clientSocket, clientName, filename);
+                }
+                else if (command.find("DELETE") == 0){
+                    std::string filename = command.substr(7);
+                    deleteFile(clientSocket, clientName, filename);
+                }
+                else if (command.find("INFO") == 0){
+                    std::string filename = command.substr(5);
+                    retrieveFileInfo(clientSocket, clientName, filename);
+                }
+                else {
+                    const char* response = "Unknown command";
+                    send(clientSocket, response, strlen(response), 0);
+                }
+            } else {
+                break;
+            }
+        }
+    }
+
+    void retrieveFileInfo(int clientSocket, const std::string& clientName, const std::string& filename) {
+        std::string fullFilePath = serverDirectory + "/" + clientName + "/" + filename;
 
         struct stat fileStat;
         if (stat(fullFilePath.c_str(), &fileStat) == 0) {
@@ -120,9 +143,8 @@ private:
         }
     }
 
-
-    void deleteFile(int clientSocket, const std::string& filename) {
-        std::string fullFilePath = serverDirectory + "/" + filename;
+    void deleteFile(int clientSocket, const std::string& clientName, const std::string& filename) {
+        std::string fullFilePath = serverDirectory + "/" + clientName + "/" + filename;
 
         if (remove(fullFilePath.c_str()) == 0) {
             const char* response = "File deleted successfully";
@@ -133,10 +155,9 @@ private:
         }
     }
 
-
-    void putFile(int clientSocket, const std::string& filename) {
-        std::string clientFilePath = clientDirectory + "/" + filename;
-        std::string serverFilePath = serverDirectory + "/" + filename;
+    void putFile(int clientSocket, const std::string& clientName, const std::string& filename) {
+        std::string clientFilePath = clientDirectory + "/" + clientName + "/" + filename;
+        std::string serverFilePath = serverDirectory + "/" + clientName + "/" + filename;
 
         std::ifstream inputFile(clientFilePath, std::ios::binary);
         if (!inputFile) {
@@ -162,11 +183,9 @@ private:
         }
     }
 
-
-
-    void getFile(int clientSocket, const std::string& filename) {
-        std::string serverFilePath = serverDirectory + "/" + filename;
-        std::string clientFilePath = clientDirectory + "/" + filename;
+    void getFile(int clientSocket, const std::string& clientName, const std::string& filename) {
+        std::string serverFilePath = serverDirectory + "/" + clientName + "/" + filename;
+        std::string clientFilePath = clientDirectory + "/" + clientName + "/" + filename;
 
         std::ifstream file(serverFilePath);
         if (file) {
@@ -182,7 +201,7 @@ private:
             }
 
             if (remove(serverFilePath.c_str()) != 0) {
-                std::cerr << "Error deleting file from serverStorage" << std::endl;
+                std::cerr << "Error deleting file from serverDirectory" << std::endl;
             }
         } else {
             const char* response = "File not found.";
@@ -190,19 +209,19 @@ private:
         }
     }
 
-
-
-    void sendFileList(int clientSocket){
+    void sendFileList(int clientSocket, const std::string& clientName){
         std::string fileList;
-        const char* path = "/home/nastia/CLionProjects/csc_1homework/serverStorage";
+        std::string path = serverDirectory + "/" + clientName;
 
         DIR *dir;
         struct dirent *ent;
 
-        if ((dir = opendir(path)) != NULL){
+        if ((dir = opendir(path.c_str())) != NULL){
             while ((ent = readdir(dir)) != NULL){
-                fileList += ent ->d_name;
-                fileList += "\n";
+                if (std::string(ent->d_name) != "." && std::string(ent->d_name) != "..") {
+                    fileList += ent->d_name;
+                    fileList += "\n";
+                }
             }
             closedir(dir);
         } else {
