@@ -89,6 +89,17 @@ private:
     }
 
     void processClientCommands(int clientSocket, const std::string& clientName) {
+
+        std::string serverClientDirectory = serverDirectory + "/" + clientName;
+        struct stat st;
+        if (stat(serverClientDirectory.c_str(), &st) != 0) {
+            if (mkdir(serverClientDirectory.c_str(), 0777) != 0) {
+                const char* response = "Error creating client folder on server";
+                send(clientSocket, response, strlen(response), 0);
+                return;
+            }
+        }
+
         while (true) {
             char buffer[1024];
             memset(buffer, 0, 1024);
