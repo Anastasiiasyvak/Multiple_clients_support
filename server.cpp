@@ -6,7 +6,6 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <ctime>
-#include <sstream>
 
 class TCPServer {
 public:
@@ -65,7 +64,7 @@ private:
     sockaddr_in serverAddr;
     sockaddr_in clientAddr;
     socklen_t clientAddrLen = sizeof(clientAddr);
-    std::string serverDirectory = "/home/nastia/CLionProjects/csc_1homework/serverDirectory";
+    std::string serverDirectory = "/home/nastia/CLionProjects/csc_1homework/serverStorage";
     std::string clientDirectory = "/home/nastia/PycharmProjects/csc_firsttt/clientDirectory";
 
 // /home/nastia/CLionProjects/csc_1homework/clientDirectory
@@ -183,7 +182,7 @@ private:
             }
 
             if (remove(serverFilePath.c_str()) != 0) {
-                std::cerr << "Error deleting file from serverDirectory" << std::endl;
+                std::cerr << "Error deleting file from serverStorage" << std::endl;
             }
         } else {
             const char* response = "File not found.";
@@ -195,7 +194,7 @@ private:
 
     void sendFileList(int clientSocket){
         std::string fileList;
-        const char* path = "/home/nastia/CLionProjects/csc_1homework/serverDirectory";
+        const char* path = "/home/nastia/CLionProjects/csc_1homework/serverStorage";
 
         DIR *dir;
         struct dirent *ent;
