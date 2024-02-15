@@ -28,6 +28,8 @@ public:
         return connect(clientSocket, reinterpret_cast<struct sockaddr*>(&serverAddr), sizeof(serverAddr)) != -1;
     }
 
+
+    
     void receiveServerMessage() const{
         char fileMessage[1024];
         memset(fileMessage, 0, sizeof(fileMessage));
