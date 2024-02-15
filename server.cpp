@@ -1,17 +1,49 @@
 #include <iostream>
-#include <fstream>
 #include <cstring>
+#include <thread>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <dirent.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <ctime>
-#include <thread>
+#include <fstream>
+
+class LinuxNetworkSystem {
+public:
+    static int createSocket(int domain, int type, int protocol) {
+        return socket(domain, type, protocol);
+    }
+
+    static int bindSocket(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
+        return bind(sockfd, addr, addrlen);
+    }
+
+    static int listenSocket(int sockfd, int backlog) {
+        return listen(sockfd, backlog);
+    }
+
+    static int acceptConnection(int sockfd, struct sockaddr *addr, socklen_t *addrlen) {
+        return accept(sockfd, addr, addrlen);
+    }
+
+    static ssize_t receiveData(int sockfd, void *buf, size_t len, int flags) {
+        return recv(sockfd, buf, len, flags);
+    }
+
+    static ssize_t sendData(int sockfd, const void *buf, size_t len, int flags) {
+        return send(sockfd, buf, len, flags);
+    }
+
+    static int closeSocket(int sockfd) {
+        return close(sockfd);
+    }
+};
 
 class TCPServer {
 public:
     TCPServer(int port) {
-        serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+        serverSocket = LinuxNetworkSystem::createSocket(AF_INET, SOCK_STREAM, 0);
         if (serverSocket == -1) {
             perror("Error creating socket");
             exit(1);
@@ -21,15 +53,15 @@ public:
         serverAddr.sin_addr.s_addr = INADDR_ANY;
         serverAddr.sin_port = htons(port);
 
-        if (bind(serverSocket, reinterpret_cast<struct sockaddr*>(&serverAddr), sizeof(serverAddr)) == -1) {
+        if (LinuxNetworkSystem::bindSocket(serverSocket, reinterpret_cast<struct sockaddr*>(&serverAddr), sizeof(serverAddr)) == -1) {
             perror("Bind failed");
-            close(serverSocket);
+            LinuxNetworkSystem::closeSocket(serverSocket);
             exit(1);
         }
 
-        if (listen(serverSocket, SOMAXCONN) == -1) {
+        if (LinuxNetworkSystem::listenSocket(serverSocket, SOMAXCONN) == -1) {
             perror("Listen failed");
-            close(serverSocket);
+            NetworkSystem::closeSocket(serverSocket);
             exit(1);
         }
 
@@ -37,7 +69,7 @@ public:
     }
 
     ~TCPServer() {
-        close(serverSocket);
+        LinuxNetworkSystem::closeSocket(serverSocket);
     }
 
     void startListening() {
@@ -45,10 +77,10 @@ public:
             sockaddr_in clientAddr{};
             socklen_t clientAddrLen = sizeof(clientAddr);
 
-            int clientSocket = accept(serverSocket, reinterpret_cast<struct sockaddr*>(&clientAddr), &clientAddrLen);
+            int clientSocket = LinuxNetworkSystem::acceptConnection(serverSocket, reinterpret_cast<struct sockaddr*>(&clientAddr), &clientAddrLen);
             if (clientSocket == -1) {
                 perror("Accept failed");
-                close(serverSocket);
+                LinuxNetworkSystem::closeSocket(serverSocket);
                 exit(1);
             }
 
@@ -70,7 +102,7 @@ private:
     void handleClientRequest(int clientSocket) {
         char buffer[1024];
         memset(buffer, 0, 1024);
-        ssize_t bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
+        ssize_t bytesReceived = LinuxNetworkSystem::receiveData(clientSocket, buffer, sizeof(buffer), 0);
 
         if (bytesReceived > 0) {
             std::cout << "Received command: " << buffer << std::endl;
@@ -82,20 +114,20 @@ private:
             }
             else {
                 const char* response = "Unknown command";
-                send(clientSocket, response, strlen(response), 0);
+                LinuxNetworkSystem::sendData(clientSocket, response, strlen(response), 0);
             }
         }
-        close(clientSocket);
+        LinuxNetworkSystem::closeSocket(clientSocket);
     }
 
     void processClientCommands(int clientSocket, const std::string& clientName) {
 
         std::string serverClientDirectory = serverDirectory + "/" + clientName;
-        struct stat st;
-        if (stat(serverClientDirectory.c_str(), &st) != 0) {
+        struct stat directoryInfo;
+        if (stat(serverClientDirectory.c_str(), &directoryInfo) != 0) {
             if (mkdir(serverClientDirectory.c_str(), 0777) != 0) {
                 const char* response = "Error creating client folder on server";
-                send(clientSocket, response, strlen(response), 0);
+                LinuxNetworkSystem::sendData(clientSocket, response, strlen(response), 0);
                 return;
             }
         }
@@ -103,7 +135,7 @@ private:
         while (true) {
             char buffer[1024];
             memset(buffer, 0, 1024);
-            ssize_t bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
+            ssize_t bytesReceived = LinuxNetworkSystem::receiveData(clientSocket, buffer, sizeof(buffer), 0);
 
             if (bytesReceived > 0) {
                 std::string command(buffer);
@@ -130,7 +162,7 @@ private:
                 }
                 else {
                     const char* response = "Unknown command";
-                    send(clientSocket, response, strlen(response), 0);
+                    LinuxNetworkSystem::sendData(clientSocket, response, strlen(response), 0);
                 }
             } else {
                 break;
@@ -146,11 +178,10 @@ private:
             std::string info = "File Information:\n";
             info += "Size: " + std::to_string(fileStat.st_size) + " bytes\n";
             info += "Last modified: " + std::string(ctime(&fileStat.st_mtime));
-
-            send(clientSocket, info.c_str(), info.size(), 0);
+            LinuxNetworkSystem::sendData(clientSocket, info.c_str(), info.size(), 0);
         } else {
             const char* response = "File not found.";
-            send(clientSocket, response, strlen(response), 0);
+            LinuxNetworkSystem::sendData(clientSocket, response, strlen(response), 0);
         }
     }
 
@@ -159,10 +190,10 @@ private:
 
         if (remove(fullFilePath.c_str()) == 0) {
             const char* response = "File deleted successfully";
-            send(clientSocket, response, strlen(response), 0);
+            LinuxNetworkSystem::sendData(clientSocket, response, strlen(response), 0);
         } else {
             const char* response = "Error deleting file";
-            send(clientSocket, response, strlen(response), 0);
+            LinuxNetworkSystem::sendData(clientSocket, response, strlen(response), 0);
         }
     }
 
@@ -170,24 +201,24 @@ private:
         std::string clientFilePath = clientDirectory + "/" + clientName + "/" + filename;
         std::string serverFilePath = serverDirectory + "/" + clientName + "/" + filename;
 
-        std::ifstream inputFile(clientFilePath, std::ios::binary);
+        std::ifstream inputFile(clientFilePath);
         if (!inputFile) {
             const char* response = "Error opening file on client";
-            send(clientSocket, response, strlen(response), 0);
+            LinuxNetworkSystem::sendData(clientSocket, response, strlen(response), 0);
             return;
         }
 
-        std::ofstream outputFile(serverFilePath, std::ios::binary);
+        std::ofstream outputFile(serverFilePath);
         if (!outputFile) {
             const char* response = "Error creating file on server";
-            send(clientSocket, response, strlen(response), 0);
+            LinuxNetworkSystem::sendData(clientSocket, response, strlen(response), 0);
             return;
         }
 
         outputFile << inputFile.rdbuf();
 
         const char* response = "File received successfully";
-        send(clientSocket, response, strlen(response), 0);
+        LinuxNetworkSystem::sendData(clientSocket, response, strlen(response), 0);
 
         if (remove(clientFilePath.c_str()) != 0) {
             std::cerr << "Error deleting file from clientDirectory" << std::endl;
@@ -201,7 +232,7 @@ private:
         std::ifstream file(serverFilePath);
         if (file) {
             std::string fileContent((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-            send(clientSocket, fileContent.c_str(), fileContent.size(), 0);
+            LinuxNetworkSystem::sendData(clientSocket, fileContent.c_str(), fileContent.size(), 0);
 
             std::ofstream clientFile(clientFilePath);
             if (clientFile) {
@@ -216,7 +247,7 @@ private:
             }
         } else {
             const char* response = "File not found.";
-            send(clientSocket, response, strlen(response), 0);
+            LinuxNetworkSystem::sendData(clientSocket, response, strlen(response), 0);
         }
     }
 
@@ -237,10 +268,10 @@ private:
             closedir(dir);
         } else {
             const char* response = "Error reading directory";
-            send(clientSocket, response, strlen(response), 0);
+            LinuxNetworkSystem::sendData(clientSocket, response, strlen(response), 0);
             return;
         }
-        send(clientSocket, fileList.c_str(), fileList.size(), 0);
+        LinuxNetworkSystem::sendData(clientSocket, fileList.c_str(), fileList.size(), 0);
     }
 };
 

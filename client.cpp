@@ -38,9 +38,7 @@ public:
         else{
             std::cerr << "Failed to receive message from server" << std::endl;
         }
-
     }
-
 
     void command() const{
         std::cout << "1)GET <filename>\n2)LIST\n3)PUT <filename>\n4)DELETE <filename>\n5)INFO <filename>\n";
@@ -68,7 +66,7 @@ public:
     void getClientName() const{
         std::string name;
         while (true) {
-            std::cout << "Enter client name: (to select folder on the server) ";
+            std::cout << "Enter client name: ";
             std::getline(std::cin, name);
             if (!name.empty()) {
                 break;
@@ -77,9 +75,6 @@ public:
         }
         send(clientSocket, name.c_str(), name.size(), 0);
     }
-
-
-
 
 private:
     int clientSocket;
@@ -104,3 +99,6 @@ int main() {
 
     return 0;
 }
+
+
+
