@@ -61,7 +61,7 @@ public:
 
         if (LinuxNetworkSystem::listenSocket(serverSocket, SOMAXCONN) == -1) {
             perror("Listen failed");
-            NetworkSystem::closeSocket(serverSocket);
+            LinuxNetworkSystem::closeSocket(serverSocket);
             exit(1);
         }
 
